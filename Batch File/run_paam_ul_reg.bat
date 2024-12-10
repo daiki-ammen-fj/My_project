@@ -1,0 +1,1 @@
+pybeacon ctrl --init --beam_mode 1 --subarray 1 --load_awv_beams --load_agc_beams --load_lo_config --pm_mode RX
