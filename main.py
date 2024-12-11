@@ -3,6 +3,7 @@
 
 import logging
 import sys
+from time import sleep
 from step1_connect import connect_to_cato_client
 from step2_run_batch import run_batch_script
 from step3_ngp800 import control_ngp800
@@ -10,19 +11,18 @@ from step4_run_paam import run_paam_script
 from step5_psg import configure_keysight_psg
 from step6_smw200a import configure_r_and_s_smw200a
 from step7_signal_analyzer import connect_signal_analyzer
-from measurement_module.measurement import perform_measurements  # Measurement processing module
-from time import sleep
+from measurement_module.measurement import perform_measurements, initialize_instruments  # Measurement processing module
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Device credentials
 DEVICE_CREDENTIALS = {
-    "cato_client": {"ip": "172.22.0.12", "username": "your_username", "password": "1234"},
-    "tightvnc_ngp800": {"ip": "172.22.2.12"},
-    "tightvnc_signal_analyzer": {"ip": "172.22.0.70", "password": "894129"},
-    "keysight_psg": {"ip": "172.22.2.31"},
-    "r_and_s_smw200a": {"url": "http://172.22.2.23", "password": "instrum"}
+    "cato_client": {"ip": "172.22.0.12", "username": "admin", "password": "1234"}, 
+    "tightvnc_ngp800": {"ip": "172.22.2.12"}, # NGP800 Power supply IP
+    "tightvnc_signal_analyzer": {"ip": "172.22.0.70", "password": "894129"}, # RS_SMx IP
+    "keysight_psg": {"ip": "172.22.2.31"}, # Keysight E8257D PSG IP
+    "r_and_s_smw200a": {"url": "http://172.22.2.23", "password": "instrument"} # RS FSx IP
 }
 
 # Flag to track the initialization state
@@ -76,9 +76,13 @@ def main():
             logging.warning("Initialization not performed, initializing now")
             initialize()
 
+        # Initialize instruments for measurement
+        logging.info("Initializing instruments for measurement")
+        rs_sm, rs_fsx = initialize_instruments()  # Initialize RS_SMx and RS_FSx
+
         logging.info("Measurement mode selected")
         while True:
-            perform_measurements()  # Execute the measurement process
+            perform_measurements(rs_sm, rs_fsx)  # Execute the measurement process with the initialized instruments
             repeat = input("Do you want to perform the measurement again? (yes/no): ").strip().lower()
             if repeat != "yes":
                 break

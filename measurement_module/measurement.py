@@ -1,35 +1,61 @@
+#!python3.11
 # measurement.py
 
 # Import necessary libraries for controlling RS_FSx (Signal and Spectrum Analyzer) and RS_SMx (Signal Generator)
+from RsInstrument import RsInstrument
 import time
 import json
 import os
+from itertools import product
+from main import DEVICE_CREDENTIALS  # Import DEVICE_CREDENTIALS from main.py
 
 class EVMMeasurementError(Exception):
     """Custom exception for EVM measurement errors."""
     pass
 
-def set_center_frequency(rs_fsx, frequency=28.01712e9):
-    """Set the center frequency of RS_FSx to a fixed value (28.01712 GHz)."""
+def load_config(config_file="measurement_config.json"):
+    """Load the measurement configuration from the JSON file."""
+    with open(config_file, 'r') as file:
+        config = json.load(file)
+    return config["parameters"]
+
+def prompt_user_for_selection(options, parameter_name):
+    """Prompt the user to select one or more options from a list."""
+    print(f"Please select {parameter_name} (separate multiple choices with commas):")
+    for idx, option in enumerate(options, 1):
+        print(f"{idx}: {option}")
+    
+    user_input = input("Your choice: ")
+    selected_indices = [int(idx) - 1 for idx in user_input.split(',') if idx.isdigit()]
+    
+    return [options[i] for i in selected_indices if 0 <= i < len(options)]
+
+def set_center_frequency(rs_fsx, frequency):
+    """Set the center frequency of RS_FSx."""
     rs_fsx.write(f"FREQ:CENT {frequency}")
-    print(f"Center frequency set to {frequency / 1e9} GHz.")
+    print(f"Center frequency set to {frequency} GHz.")
 
 def load_quicksave(rs_fsx, quicksave_num=6):
-    """Load the quicksave template 'quicksave 6' into RS_FSx."""
+    """Load a quicksave template into RS_FSx."""
     rs_fsx.write(f"MMEM:LOAD 'quicksave{quicksave_num}.sav'")
     print(f"Loaded quicksave {quicksave_num}.")
 
-def find_evm_threshold(rs_sm, rs_fsx, threshold=10, start_power=-39, end_power=-11, step=1):
-    """Find the power levels where EVM is below the threshold (e.g., 10%)."""
+def find_evm_threshold(rs_sm, rs_fsx, config):
+    """Find the power levels where EVM is below the threshold."""
+    threshold = config["evm_threshold"]
+    start_power = config["input_power_range"]["start"]
+    end_power = config["input_power_range"]["end"]
+    step = config["input_power_range"]["step"]
+
     power_points = []
-    
+
     for power in range(start_power, end_power + 1, step):
-        rs_sm.write(f"POW:AMPL {power} dBm")  # Set the output power of the signal generator
+        rs_sm.write(f"POW:AMPL {power} dBm")  # Set the output power
         time.sleep(1)  # Wait for the power setting to take effect
-        
+
         evm = float(rs_fsx.query("CALC:MARK:RES:EVM?"))  # Query the EVM value
         print(f"Power = {power} dBm, EVM = {evm}%")
-        
+
         if evm <= threshold:
             power_points.append({"input_power": power, "evm": evm})
         else:
@@ -37,101 +63,129 @@ def find_evm_threshold(rs_sm, rs_fsx, threshold=10, start_power=-39, end_power=-
             break
 
     if not power_points:
-        raise EVMMeasurementError("EVM is not below the threshold at any power level in the specified range.")
-    
+        raise EVMMeasurementError("EVM is not below the threshold at any power level.")
+
     return power_points
 
-def measure_parameters(rs_fsx, path_loss=-56.905):
-    """
-    Measure additional parameters like CF(dB), O/P Power(dBm), ACLR Lower(dBc), ACLR Upper(dBc).
-    Calculate EIRP using the formula: EIRP = O/P Power - Path Loss.
-    """
-    cf = float(rs_fsx.query("CALC:MARK:RES:CF?"))  # Query the center frequency (CF)
-    output_power = float(rs_fsx.query("MEASU:SCAL:POW?"))  # Query the output power (O/P Power)
-    aclr_lower = float(rs_fsx.query("CALC:MARK:RES:ACLR:LOWER?"))  # Query ACLR Lower
-    aclr_upper = float(rs_fsx.query("CALC:MARK:RES:ACLR:UPPER?"))  # Query ACLR Upper
+
+def measure_parameters(rs_fsx, config):
+    """Measure additional parameters like CF, O/P Power, ACLR, and EIRP."""
+    path_loss = config["path_loss"]
+
+    cf = float(rs_fsx.query("CALC:MARK:RES:CF?"))  # Center frequency
+    output_power = float(rs_fsx.query("MEASU:SCAL:POW?"))  # Output power
+    aclr_lower = float(rs_fsx.query("CALC:MARK:RES:ACLR:LOWER?"))  # ACLR Lower
+    aclr_upper = float(rs_fsx.query("CALC:MARK:RES:ACLR:UPPER?"))  # ACLR Upper
     eirp = output_power - path_loss  # Calculate EIRP
+
     return cf, output_power, aclr_lower, aclr_upper, eirp
 
-def change_power_and_measure(rs_sm, rs_fsx, start_power, end_power, step=1, path_loss=-56.905):
-    """
-    Change the input power of RS_SMx and measure the EVM and other parameters at each power level within a specific range.
-    Include Path Loss and EIRP in the measurement data.
-    """
-    # Find the range where EVM stays below the threshold (10%)
-    threshold_points = find_evm_threshold(rs_sm, rs_fsx, threshold=10, start_power=start_power, end_power=end_power, step=step)
-    
-    # If there are no points found, return an empty list
-    if not threshold_points:
-        print("No power points found with EVM below threshold.")
-        return []
+def initialize_instruments():
+    """Initialize RS_SMx (Signal Generator) and RS_FSx (Signal Analyzer)."""
+    try:
+        # Get IP addresses from DEVICE_CREDENTIALS
+        rs_sm_ip = DEVICE_CREDENTIALS["tightvnc_signal_analyzer"]["ip"]  # RS_SMx IP address
+        rs_fsx_ip = DEVICE_CREDENTIALS["r_and_s_smw200a"]["url"]  # RS_FSx IP address
 
-    # Find the optimal power range where EVM stays below threshold
-    optimal_range_start = threshold_points[0]["input_power"]
-    optimal_range_end = threshold_points[-1]["input_power"]
+        # Create instances for RS_SMx (Signal Generator) and RS_FSx (Signal Analyzer)
+        rs_sm = RsInstrument(f"TCPIP::{rs_sm_ip}::INSTR")  # Use the IP address for RS_SMx
+        rs_fsx = RsInstrument(f"TCPIP::{rs_fsx_ip}::INSTR")  # Use the IP address for RS_FSx
 
-    print(f"Measuring between {optimal_range_start} dBm and {optimal_range_end} dBm")
-    
-    all_power_points = []
-    for power in range(optimal_range_start, optimal_range_end + 1):
-        rs_sm.write(f"POW:AMPL {power} dBm")  # Set the output power of the signal generator
-        time.sleep(1)  # Wait for the power setting to take effect
-        
-        # Measure EVM using RS_FSx
-        evm = float(rs_fsx.query("CALC:MARK:RES:EVM?"))  # Query the EVM value
-        cf, output_power, aclr_lower, aclr_upper, eirp = measure_parameters(rs_fsx, path_loss)  # Measure other parameters
-        
-        print(f"Power = {power} dBm, EVM = {evm}%, CF = {cf} dB, O/P Power = {output_power} dBm, ACLR Lower = {aclr_lower} dBc, ACLR Upper = {aclr_upper} dBc, EIRP = {eirp} dBm")
-        
-        # If EVM exceeds threshold, stop the measurement
-        if evm > 10:
-            print(f"Stopping measurement as EVM exceeded threshold ({evm}%) at power = {power} dBm.")
-            break
-        
-        # Record the data
-        all_power_points.append({
-            "input_power": power,
-            "evm": evm,
+        # Connect to the instruments
+        rs_sm.connect()
+        rs_fsx.connect()
+
+        return rs_sm, rs_fsx
+    except Exception as e:
+        print(f"Error initializing instruments: {e}")
+        exit(1)  # Exit if instruments cannot be initialized
+
+def perform_measurements(rs_sm, rs_fsx, config):
+    """Perform the full measurement process with all parameter combinations."""
+    results = []
+
+    # Get user selections for parameters
+    directions = prompt_user_for_selection(config["directions"], "Direction")
+    center_frequencies = prompt_user_for_selection([str(freq) for freq in config["center_frequencies"]], "Center Frequency")
+    bandwidths = prompt_user_for_selection([str(bw) for bw in config["bandwidths"]], "Bandwidth")
+    modulations = prompt_user_for_selection(config["modulation_types"], "Modulation")
+    input_powers = prompt_user_for_selection([str(i) for i in range(config["input_power_range"]["start"], config["input_power_range"]["end"] + 1, config["input_power_range"]["step"])], "Input Power")
+
+    # Iterate over all combinations of parameters
+    param_combinations = product(
+        directions,
+        center_frequencies,
+        bandwidths,
+        modulations,
+        input_powers
+    )
+
+    for direction, frequency, bandwidth, modulation, input_power in param_combinations:
+        frequency = float(frequency)
+        bandwidth = int(bandwidth)
+        input_power = int(input_power)
+
+        print(f"Measuring: Direction={direction}, Freq={frequency} GHz, BW={bandwidth} MHz, Modulation={modulation}, Power={input_power} dBm")
+
+        # Set up the RS_FSx with the current parameters
+        set_center_frequency(rs_fsx, frequency)
+        load_quicksave(rs_fsx)
+
+        # Measure EVM and other parameters
+        try:
+            evm_points = find_evm_threshold(rs_sm, rs_fsx, config)
+        except EVMMeasurementError as e:
+            print(f"Measurement failed: {e}")
+            continue
+
+        # Measure additional parameters
+        cf, output_power, aclr_lower, aclr_upper, eirp = measure_parameters(rs_fsx, config)
+
+        # Collect results for this combination
+        results.append({
+            "direction": direction,
+            "center_frequency": frequency,
+            "bandwidth": bandwidth,
+            "modulation": modulation,
+            "input_power": input_power,
+            "evm_points": evm_points,
             "cf": cf,
             "output_power": output_power,
             "aclr_lower": aclr_lower,
             "aclr_upper": aclr_upper,
-            "path_loss": path_loss,
             "eirp": eirp
         })
-    
-    return all_power_points
 
-def save_measurement_results(results, filename="measurement_results.json"):
-    """Save the measurement results to a JSON file in a specified folder."""
+        # Save results with the generated filename
+        save_measurement_results(results, frequency, bandwidth, modulation)
+
+    return results
+
+
+def save_measurement_results(results, frequency, bandwidth, modulation, directory="measurement_results"):
+    """Save the measurement results to a JSON file with a dynamic filename."""
     # Create the directory if it doesn't exist
-    directory = os.path.dirname(filename)
-    if directory and not os.path.exists(directory):
+    if not os.path.exists(directory):
         os.makedirs(directory)
 
-    # Write the results to the JSON file
+    # Generate the filename based on the frequency, bandwidth, and modulation
+    filename = f"{directory}/results_{frequency}GHz_{bandwidth}MHz_{modulation}.json"
+    
     with open(filename, 'w') as json_file:
         json.dump(results, json_file, indent=4)
     print(f"Results saved to {filename}")
 
-def perform_measurements(rs_sm, rs_fsx, save_directory="results"):
-    """Perform the full measurement process and save the results."""
+
+# Example of usage:
+if __name__ == "__main__":
+    # Load configuration parameters
+    config = load_config()
     
-    # a: Set the center frequency to 28.01712 GHz
-    set_center_frequency(rs_fsx, 28.01712e9)  # Set the center frequency to 28.01712 GHz
+    # Initialize instruments
+    rs_sm, rs_fsx = initialize_instruments()  # Initialize RS_SMx and RS_FSx
     
-    # b: Load the quicksave template 6
-    load_quicksave(rs_fsx, 6)
+    # Perform measurements
+    results = perform_measurements(rs_sm, rs_fsx, config)
     
-    # c: Find the power levels where EVM stays below 10% and record the data
-    try:
-        power_points = change_power_and_measure(rs_sm, rs_fsx, start_power=-50, end_power=-5, step=1)
-    except EVMMeasurementError as e:
-        print(f"Measurement failed: {e}")
-        return None
-    
-    # d: Save the results to a specified directory and filename
-    save_filename = os.path.join(save_directory, "measurement_results.json")
-    save_measurement_results(power_points, save_filename)
-    
-    return power_points
+    # Save the results
+    save_measurement_results(results)
