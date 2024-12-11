@@ -1,3 +1,4 @@
+#!python3.11
 # step3_ngp800.py
 
 from instrument_lib import RS_NGPx

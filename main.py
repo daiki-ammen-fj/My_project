@@ -1,3 +1,4 @@
+#!python3.11
 # main.py
 
 import logging

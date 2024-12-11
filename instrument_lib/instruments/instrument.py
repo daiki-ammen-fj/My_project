@@ -1,5 +1,5 @@
 """Instrument class."""
-
+#!python3.11
 from abc import ABC, abstractmethod
 from typing import cast, Optional, Type, Union, Protocol, runtime_checkable
 from time import sleep

@@ -1,3 +1,4 @@
+#!python3.11
 # step5_psg.py
 
 from instrument_lib import KS_PSG
