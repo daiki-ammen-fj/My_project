@@ -1,0 +1,15 @@
+{
+  "parameters": {
+    "directions": ["Uplink", "Downlink"],
+    "center_frequencies": [28.01712, 29.12304],
+    "bandwidths": [100, 200],
+    "modulation_types": ["QPSK", "16QAM", "64QAM", "256QAM", "CW"],
+    "input_power_range": {
+      "start": -40,
+      "end": -5,
+      "step": 1
+    },
+    "evm_threshold": 10,
+    "path_loss": -56.905
+  }
+}
