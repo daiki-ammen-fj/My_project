@@ -36,7 +36,8 @@ def set_center_frequency(rs_fsx, frequency):
     print(f"Center frequency set to {frequency} GHz.")
 
 def load_quicksave(rs_fsx, quicksave_num=6):
-    """Load a quicksave template into RS_FSx."""
+    """Load the quicksave template 'quicksave 6' into RS_FSx."""
+    # Load the quicksave template 6
     rs_fsx.write(f"MMEM:LOAD 'quicksave{quicksave_num}.sav'")
     print(f"Loaded quicksave {quicksave_num}.")
 
@@ -48,7 +49,8 @@ def find_evm_threshold(rs_sm, rs_fsx, config):
     step = config["input_power_range"]["step"]
 
     power_points = []
-
+    
+    # Change the power from start_power to end_power in steps of 1 dBm
     for power in range(start_power, end_power + 1, step):
         rs_sm.write(f"POW:AMPL {power} dBm")  # Set the output power
         time.sleep(1)  # Wait for the power setting to take effect

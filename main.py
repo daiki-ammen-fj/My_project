@@ -1,4 +1,5 @@
 #!python3.11
+#!python3.11
 # main.py
 
 import logging
@@ -33,10 +34,7 @@ def initialize():
     global initialized
     try:
         logging.info("Step 1: Connect to Cato client")
-        cato_ip = DEVICE_CREDENTIALS["cato_client"]["ip"]
-        cato_username = DEVICE_CREDENTIALS["cato_client"]["username"]
-        cato_password = DEVICE_CREDENTIALS["cato_client"]["password"]
-        connect_to_cato_client(cato_ip, cato_username, cato_password)
+        connect_to_cato_client(DEVICE_CREDENTIALS["cato_client"]["ip"], DEVICE_CREDENTIALS["cato_client"]["password"])
 
         logging.info("Step 2: Run the batch script")
         run_batch_script(r"C:\Users\labuser\qlight-control\run_qlight_check.bat")
@@ -61,7 +59,7 @@ def initialize():
         logging.info("Initialization completed.")
     except Exception as e:
         logging.error(f"Initialization failed: {e}", exc_info=True)
-        sys.exit(1)  # Exit with error code 1
+        exit(1)
 
 def main():
     global initialized
@@ -88,7 +86,8 @@ def main():
                 break
     else:
         logging.warning("Invalid mode selected")
-        sys.exit(1)
+        exit(1)
 
 if __name__ == "__main__":
     main()
+

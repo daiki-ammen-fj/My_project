@@ -1,6 +1,7 @@
 #!python3.11
 # step7_signal_analyzer.py
 
+#!python3.11
 import time
 from logging import getLogger, INFO, StreamHandler
 from instrument_lib import RS_FSx  # Import the instrument driver
