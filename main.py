@@ -1,7 +1,10 @@
 #!python3.11
+#!python3.11
 # main.py
 
-import logging,argparse
+import logging
+import sys
+from time import sleep
 from step1_connect import connect_to_cato_client
 from step2_run_batch import run_batch_script
 from step3_ngp800 import control_ngp800
@@ -27,11 +30,11 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 # Device credentials
 DEVICE_CREDENTIALS = {
-    "cato_client": {"ip": "172.22.0.12", "password": "1234"},
-    "tightvnc_ngp800": {"ip": "172.22.2.12"},
-    "tightvnc_signal_analyzer": {"ip": "172.22.0.51", "password": "894129"},
-    "keysight_psg": {"ip": "172.22.2.35"},
-    "r_and_s_smw200a": {"url": "http://172.22.2.31", "password": "instrum"}
+    "cato_client": {"ip": "172.22.0.12", "username": "admin", "password": "1234"}, 
+    "tightvnc_ngp800": {"ip": "172.22.2.12"}, # NGP800 Power supply IP
+    "tightvnc_signal_analyzer": {"ip": "172.22.0.70", "password": "894129"}, # RS_SMx IP
+    "keysight_psg": {"ip": "172.22.2.31"}, # Keysight E8257D PSG IP
+    "r_and_s_smw200a": {"url": "http://172.22.2.23", "password": "instrument"} # RS FSx IP
 }
 
 # Flag to track the initialization state
@@ -82,9 +85,13 @@ def main():
             logging.warning("Initialization not performed, initializing now")
             initialize()
 
+        # Initialize instruments for measurement
+        logging.info("Initializing instruments for measurement")
+        rs_sm, rs_fsx = initialize_instruments()  # Initialize RS_SMx and RS_FSx
+
         logging.info("Measurement mode selected")
         while True:
-            perform_measurement()  # Execute the measurement process
+            perform_measurements(rs_sm, rs_fsx)  # Execute the measurement process with the initialized instruments
             repeat = input("Do you want to perform the measurement again? (yes/no): ").strip().lower()
             if repeat != "yes":
                 break

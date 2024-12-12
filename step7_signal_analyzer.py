@@ -1,3 +1,4 @@
+#!python3.11
 # step7_signal_analyzer.py
 
 #!python3.11
