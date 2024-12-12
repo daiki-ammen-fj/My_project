@@ -1,3 +1,4 @@
+#!python3.11
 # step6_smw200a.py
 
 import logging
