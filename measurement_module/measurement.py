@@ -37,7 +37,7 @@ def change_power_and_measure(rs_sm, rs_fsx, start_power, end_power, step=1):
     
     return power_points
 
-def perform_measurements(rs_sm, rs_fsx):
+def perform_measurement(rs_sm, rs_fsx):
     """Perform the full measurement process."""
     
     # a: Set the center frequency to 28.01712 GHz

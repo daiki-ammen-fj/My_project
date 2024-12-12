@@ -1,7 +1,7 @@
 #!python3.11
 # main.py
 
-import logging
+import logging,argparse
 from step1_connect import connect_to_cato_client
 from step2_run_batch import run_batch_script
 from step3_ngp800 import control_ngp800
@@ -11,6 +11,16 @@ from step6_smw200a import configure_r_and_s_smw200a
 from step7_signal_analyzer import connect_signal_analyzer
 from measurement_module.measurement import perform_measurement  # Measurement processing module
 from time import sleep
+
+# argparser
+parser = argparse.ArgumentParser(description='debug arguments')    #argument for debug description
+
+# add args
+parser.add_argument('-b','--batch', help='この引数の説明（なくてもよい）', default=r"C:\Users\labuser\qlight-control\run_qlight_check.bat")    #Must args
+parser.add_argument('-p','--paam' , help='この引数の説明（なくてもよい）', default=r"C:\Users\labuser\pybeacon\run_paam_dl_reg.bat")    #Must args
+
+# parse args
+args = parser.parse_args()
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -35,14 +45,14 @@ def initialize():
         connect_to_cato_client(DEVICE_CREDENTIALS["cato_client"]["ip"], DEVICE_CREDENTIALS["cato_client"]["password"])
 
         logging.info("Step 2: Run the batch script")
-        run_batch_script(r"C:\Users\labuser\qlight-control\run_qlight_check.bat")
+        run_batch_script(args.batch)
 
         logging.info("Step 3: Control the NGP800 power supply")
         control_ngp800(DEVICE_CREDENTIALS["tightvnc_ngp800"]["ip"])
 
         logging.info("Step 4: Run the PAAM download script")
         sleep(10)
-        run_paam_script(r"C:\Users\labuser\pybeacon\run_paam_dl_reg.bat")
+        run_paam_script(args.paam)
 
         logging.info("Step 5: Configure Keysight PSG")
         configure_keysight_psg(DEVICE_CREDENTIALS["keysight_psg"]["ip"])
