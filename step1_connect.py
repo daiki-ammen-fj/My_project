@@ -2,24 +2,24 @@
 # step1_connect.py
 
 import paramiko
-import subprocess
 import logging
 import time
 import sys
 
-def connect_to_cato_client(ip, username, password, retries=3, timeout=10):
+def connect_to_cato_client(ip, username, retries=3, timeout=10, key_filename=None, port=22):
     """
-    Connect to the Cato client via SSH and then to TightVNC.
+    Connect to the Cato client via SSH on a Windows machine using SSH key authentication.
 
     Args:
         ip (str): Cato client's IP address.
         username (str): SSH username.
-        password (str): SSH password.
         retries (int): Number of connection retries.
         timeout (int): Connection timeout in seconds.
+        key_filename (str): Path to the private key file for SSH authentication.
+        port (int): SSH port (default is 22).
 
     Raises:
-        Exception: If SSH or TightVNC connection fails after retries.
+        Exception: If SSH connection fails after retries.
     """
     logging.info("Step 1: Connecting to Cato client...")
 
@@ -27,19 +27,25 @@ def connect_to_cato_client(ip, username, password, retries=3, timeout=10):
     try:
         for attempt in range(1, retries + 1):
             try:
-                # Connect to Cato client via SSH using paramiko (for actual SSH connection)
                 ssh_client = paramiko.SSHClient()
                 ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                ssh_client.connect(ip, username=username, password=password, timeout=timeout)
+                
+                # Use SSH key for authentication (no password)
+                if key_filename:
+                    ssh_client.connect(ip, username=username, key_filename=key_filename, port=port, timeout=timeout)
+                else:
+                    ssh_client.connect(ip, username=username, port=port, timeout=timeout)
 
                 logging.info(f"Successfully connected to Cato client at {ip} on attempt {attempt}.")
 
-                # Proceed to connect to TightVNC
-                connect_to_vnc(ip, password)
-                return  # Exit on success
+                stdin, stdout, stderr = ssh_client.exec_command('cd')  
+                current_dir = stdout.read().decode().strip()
+                logging.info(f"Current directory after connection: {current_dir}")
+
+                return ssh_client  # Return the ssh_client object for further use
 
             except paramiko.AuthenticationException:
-                logging.error(f"Authentication failed for {ip}. Check username/password.")
+                logging.error(f"Authentication failed for {ip}. Check SSH key.")
                 break  # Authentication failure should not retry
             except (paramiko.SSHException, Exception) as e:
                 logging.error(f"Error during SSH connection to {ip} on attempt {attempt}: {e}")
@@ -54,63 +60,30 @@ def connect_to_cato_client(ip, username, password, retries=3, timeout=10):
     raise Exception("SSH connection to Cato client failed after retries.")
 
 
-def connect_to_vnc(ip, password, retries=3, timeout=10):
-    """
-    Connect to the Cato client using TightVNC.
-
-    Args:
-        ip (str): VNC server's IP address.
-        password (str): VNC connection password.
-        retries (int): Number of connection retries.
-        timeout (int): Connection timeout in seconds.
-
-    Raises:
-        Exception: If VNC connection fails after retries.
-    """
-    logging.info(f"Step 2: Connecting to TightVNC at {ip}...")
-
-    for attempt in range(1, retries + 1):
-        try:
-            vnc_command = ["vncviewer", f"{ip}:5900", "-password", password]
-            logging.info(f"Executing command: {' '.join(vnc_command)}")
-
-            result = subprocess.run(vnc_command, check=True, timeout=timeout)
-
-            if result.returncode == 0:
-                logging.info(f"Successfully connected to VNC at {ip} on attempt {attempt}")
-                return  # Exit on success
-            else:
-                logging.error(f"VNC connection returned non-zero code {result.returncode}")
-
-        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, Exception) as e:
-            logging.error(f"Error during VNC connection to {ip} on attempt {attempt}: {e}")
-
-        logging.warning(f"Retrying VNC connection ({attempt}/{retries})...")
-        time.sleep(2)  # Wait before retrying
-
-    raise Exception("TightVNC connection failed after retries.")
-
-
-def connect_through_jump_server(jump_server_ip, jump_server_username, target_ip, target_username):
+def connect_through_jump_server(jump_server_ip, jump_server_username, target_ip, target_username, port=22):
     """
     Connect to the target server through the jump server using paramiko SSH.
+
+    Args:
+        jump_server_ip (str): Jump server IP address.
+        jump_server_username (str): Jump server SSH username.
+        target_ip (str): Target server IP address.
+        target_username (str): Target server SSH username.
+        port (int): SSH port (default is 22).
     """
-    logging.info("Attempting to connect to jump server...")
-
-    jump_client = paramiko.SSHClient()
-    jump_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
+    logging.info("Step 1: Connecting to Cato client...")
     try:
         # Connect to the jump server
-        logging.info(f"Connecting to jump server: {jump_server_ip}")
-        jump_client.connect(jump_server_ip, username=jump_server_username)
+        jump_client = paramiko.SSHClient()
+        jump_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-        logging.info(f"Successfully connected to jump server: {jump_server_ip}")
+        logging.info(f"Connecting to jump server: {jump_server_ip}")
+        jump_client.connect(jump_server_ip, username=jump_server_username, port=port)
 
         # Use jump server to create an SSH connection to the target server
         jump_transport = jump_client.get_transport()
-        dest_addr = (target_ip, 22)
-        local_addr = (jump_server_ip, 22)
+        dest_addr = (target_ip, port)
+        local_addr = (jump_server_ip, port)
         jump_channel = jump_transport.open_channel('direct-tcpip', dest_addr, local_addr)
 
         # Connect to the target server via jump server channel
@@ -118,14 +91,15 @@ def connect_through_jump_server(jump_server_ip, jump_server_username, target_ip,
         target_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         target_client.connect(target_ip, username=target_username, sock=jump_channel)
 
-        logging.info(f"Successfully connected to target server: {target_ip}")
+        # Log success for both jump server and target server connection
+        logging.info("Successfully connected to target server via jump server.")
 
-        # You can now interact with the target server (run commands, etc.)
-        # Example of running a command on the target server
-        stdin, stdout, stderr = target_client.exec_command('hostname')
-        logging.info(f"Target server hostname: {stdout.read().decode().strip()}")
+        # Optionally, execute a command on the target server (e.g., retrieve hostname)
+        stdin, stdout, stderr = target_client.exec_command('cd')  # For Windows, 'cd' will show the current directory
+        current_dir = stdout.read().decode().strip()
+        logging.info(f"Current directory on target server: {current_dir}")
 
-        # Optionally, close the target client
+        # Close the target client
         target_client.close()
 
     except paramiko.AuthenticationException:
@@ -135,19 +109,3 @@ def connect_through_jump_server(jump_server_ip, jump_server_username, target_ip,
         sys.exit(1)  # Exit the program if connection fails
     finally:
         jump_client.close()
-
-
-def main():
-    logging.basicConfig(level=logging.INFO)
-
-    # User-defined values
-    jump_server_ip = '10.18.177.82'
-    jump_server_username = '00210404361'
-    target_ip = '172.22.0.12'
-    target_username = 'labuser'
-
-    connect_through_jump_server(jump_server_ip, jump_server_username, target_ip, target_username)
-
-
-if __name__ == '__main__':
-    main()

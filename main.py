@@ -4,7 +4,7 @@
 import logging
 import sys
 from time import sleep
-from step1_connect import connect_to_cato_client, connect_through_jump_server
+from step1_connect import connect_to_cato_client, connect_through_jump_server 
 from step2_run_batch import run_batch_script
 from step3_ngp800 import control_ngp800
 from step4_run_paam import run_paam_script
@@ -29,10 +29,29 @@ DEVICE_CREDENTIALS = {
 # Flag to track the initialization state
 initialized = False
 
-def initialize():
-    """Initialization process (Step 2-7)"""
+def initialize(location, mode):
+    """Initialization process (Step 1-7)"""
+    logging.info("Step 1: Connect Cato cliant")
     global initialized
     try:
+        if location == "2":  # Japan - Connect through Jump Server
+            logging.info("Japan location selected")
+            jump_username = input("Please enter your jump server username: ").strip()
+            logging.info("Connecting through jump server")
+            connect_through_jump_server(
+                DEVICE_CREDENTIALS["jump_server_ip"],  # Jump server IP
+                jump_username,  # Username for the jump server
+                DEVICE_CREDENTIALS["cato_client"]["ip"],  # Target server IP (Cato client)
+                DEVICE_CREDENTIALS["cato_client"]["username"]  # Target server username
+            )
+        elif location == "1":  # US - Connect directly to Cato client
+            logging.info("US location selected")
+            logging.info("Connecting directly to Cato client")
+            connect_to_cato_client(
+                DEVICE_CREDENTIALS["cato_client"]["ip"],
+                DEVICE_CREDENTIALS["cato_client"]["username"],
+            )
+
         logging.info("Step 2: Run the batch script")
         run_batch_script(r"C:\Users\labuser\qlight-control\run_qlight_check.bat")
 
@@ -89,32 +108,15 @@ def main():
         location = get_location()  # User selects location
         mode = get_mode()  # User selects mode
 
-        if location == "2":  # Japan - Connect through Jump Server
-            logging.info("Japan location selected")
-            jump_username = input("Please enter your jump server username: ").strip()
-            logging.info("Connecting through jump server")
-            connect_through_jump_server(
-                DEVICE_CREDENTIALS["jump_server_ip"],  # Jump server IP
-                jump_username,  # Username for the jump server
-                DEVICE_CREDENTIALS["cato_client"]["ip"],  # Target server IP (Cato client)
-                DEVICE_CREDENTIALS["cato_client"]["username"]  # Target server username
-            )
-        elif location == "1":  # US - Connect directly to Cato client
-            logging.info("US location selected")
-            logging.info("Connecting directly to Cato client")
-            connect_to_cato_client(
-                DEVICE_CREDENTIALS["cato_client"]["ip"],
-                DEVICE_CREDENTIALS["cato_client"]["username"],
-                DEVICE_CREDENTIALS["cato_client"]["password"],
-            )
-
+        # Proceed to initialization
         if mode == "1":  # Initialization Mode
             logging.info("Initialization mode selected")
-            initialize()  # Only initialization steps (Step 2-7)
+            initialize(location, mode)  # Initialization steps (Step 2-7)
+
         elif mode == "2":  # Measurement Mode
             if not initialized:
                 logging.warning("Initialization not performed, initializing now")
-                initialize()
+                initialize(location, mode)
 
             logging.info("Initializing instruments for measurement")
             rs_sm_url = DEVICE_CREDENTIALS["r_and_s_smw200a"]["url"]
