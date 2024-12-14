@@ -3,7 +3,7 @@
 # main.py
 
 import logging
-import sys
+import sys,argparse
 from time import sleep
 from step1_connect import connect_to_cato_client
 from step2_run_batch import run_batch_script
@@ -12,7 +12,8 @@ from step4_run_paam import run_paam_script
 from step5_psg import configure_keysight_psg
 from step6_smw200a import configure_r_and_s_smw200a
 from step7_signal_analyzer import connect_signal_analyzer
-from measurement_module.measurement import perform_measurement  # Measurement processing module
+from measurement_module.measurement import perform_measurements  # Measurement processing module
+from measurement_module.measurement import initialize_instruments  # 
 from time import sleep
 
 # argparser
