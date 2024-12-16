@@ -13,6 +13,16 @@ from step6_smw200a import configure_r_and_s_smw200a
 from step7_spectrum_analyzer import connect_spectrum_analyzer
 from measurement_module.measurement import perform_measurements, initialize_instruments
 
+# argparser
+parser = argparse.ArgumentParser(description='debug arguments')    #argument for debug description
+
+# add args
+parser.add_argument('-b','--batch', help='この引数の説明（なくてもよい）', default=r"C:\Users\labuser\qlight-control\run_qlight_check.bat")    #Must args
+parser.add_argument('-p','--paam' , help='この引数の説明（なくてもよい）', default=r"C:\Users\labuser\pybeacon\run_paam_dl_reg.bat")    #Must args
+
+# parse args
+args = parser.parse_args()
+
 # Logging configuration
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
