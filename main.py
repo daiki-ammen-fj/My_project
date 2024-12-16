@@ -29,7 +29,7 @@ DEVICE_CREDENTIALS = {
 # Flag to track the initialization state
 initialized = False
 
-def initialize(location, mode):
+def initialize(location, mode, target_dir):
     """Initialization process (Step 1-7)"""
     global initialized
     try:
@@ -41,7 +41,8 @@ def initialize(location, mode):
                 DEVICE_CREDENTIALS["jump_server_ip"],
                 jump_username,
                 DEVICE_CREDENTIALS["cato_client"]["ip"],
-                DEVICE_CREDENTIALS["cato_client"]["username"]
+                DEVICE_CREDENTIALS["cato_client"]["username"],
+                target_dir= r"C:\Users\labuser\qlight-control\run_qlight_check.bat"  # Pass target_dir here
             )
         elif location == "1":  # US - Connect directly to Cato client
             logging.info("US location selected")
@@ -52,7 +53,7 @@ def initialize(location, mode):
             )
 
         logging.info("Step 2: Run the batch script")
-        run_batch_script(r"C:\Users\labuser\qlight-control\run_qlight_check.bat")
+        run_batch_script(target_dir)  # Pass target_dir here
 
         logging.info("Step 3: Control the NGP800 power supply")
         control_ngp800(DEVICE_CREDENTIALS["RS_ngp800"]["ip"])
@@ -102,14 +103,16 @@ def main():
         location = get_location()
         mode = get_mode()
 
+        target_dir = input("Please enter the target directory: ").strip()  # Ask for target directory
+
         if mode == "1":
             logging.info("Initialization mode selected")
-            initialize(location, mode)
+            initialize(location, mode, target_dir)
 
         elif mode == "2":
             if not initialized:
                 logging.warning("Initialization not performed, initializing now")
-                initialize(location, mode)
+                initialize(location, mode, target_dir)
 
             logging.info("Initializing instruments for measurement")
             rs_sm_url = DEVICE_CREDENTIALS["RS_signal_generator_smw200a"]["ip"]
