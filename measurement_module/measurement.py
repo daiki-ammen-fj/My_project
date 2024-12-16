@@ -7,7 +7,6 @@ import time
 import json
 import os
 from itertools import product
-from main import DEVICE_CREDENTIALS  # Import DEVICE_CREDENTIALS from main.py
 
 class EVMMeasurementError(Exception):
     """Custom exception for EVM measurement errors."""
@@ -82,25 +81,27 @@ def measure_parameters(rs_fsx, config):
 
     return cf, output_power, aclr_lower, aclr_upper, eirp
 
-def initialize_instruments():
+def initialize_instruments(rs_sm_url, rs_fsx_url):
     """Initialize RS_SMx (Signal Generator) and RS_FSx (Signal Analyzer)."""
     try:
-        # Get IP addresses from DEVICE_CREDENTIALS
-        rs_sm_ip = DEVICE_CREDENTIALS["tightvnc_signal_analyzer"]["ip"]  # RS_SMx IP address
-        rs_fsx_ip = DEVICE_CREDENTIALS["r_and_s_smw200a"]["url"]  # RS_FSx IP address
-
         # Create instances for RS_SMx (Signal Generator) and RS_FSx (Signal Analyzer)
-        rs_sm = RsInstrument(f"TCPIP::{rs_sm_ip}::INSTR")  # Use the IP address for RS_SMx
-        rs_fsx = RsInstrument(f"TCPIP::{rs_fsx_ip}::INSTR")  # Use the IP address for RS_FSx
+        rs_sm = RsInstrument(f"TCPIP::{rs_sm_url}::INSTR")  # Use the URL as the IP address for RS_SMx
+        rs_fsx = RsInstrument(f"TCPIP::{rs_fsx_url}::INSTR")  # Use the URL as the IP address for RS_FSx
 
         # Connect to the instruments
+        print("Connecting to RS_SMx (Signal Generator)...")
         rs_sm.connect()
+        print(f"Connected to RS_SMx. Device info: {rs_sm.query('*IDN?')}")
+
+        print("Connecting to RS_FSx (Signal Analyzer)...")
         rs_fsx.connect()
+        print(f"Connected to RS_FSx. Device info: {rs_fsx.query('*IDN?')}")
 
         return rs_sm, rs_fsx
     except Exception as e:
         print(f"Error initializing instruments: {e}")
-        exit(1)  # Exit if instruments cannot be initialized
+        raise
+
 
 def perform_measurements(rs_sm, rs_fsx, config):
     """Perform the full measurement process with all parameter combinations."""
@@ -177,17 +178,3 @@ def save_measurement_results(results, frequency, bandwidth, modulation, director
         json.dump(results, json_file, indent=4)
     print(f"Results saved to {filename}")
 
-
-# Example of usage:
-if __name__ == "__main__":
-    # Load configuration parameters
-    config = load_config()
-    
-    # Initialize instruments
-    rs_sm, rs_fsx = initialize_instruments()  # Initialize RS_SMx and RS_FSx
-    
-    # Perform measurements
-    results = perform_measurements(rs_sm, rs_fsx, config)
-    
-    # Save the results
-    save_measurement_results(results)

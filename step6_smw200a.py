@@ -3,17 +3,17 @@
 
 from instrument_lib import RS_SMx  # Import the instrument driver
 
-def configure_r_and_s_smw200a(url: str, password: str) -> None:
-    """Configures the R&S SMW200A signal generator."""
+def configure_r_and_s_smw200a(ip):
+    """Configures the R&S SMW200A Signal Generator."""
 
     print("Initializing R&S SMW200A Signal Generator...")
 
     # Create an instance of the RS_SMx driver
-    sig_gen = RS_SMx(ip_address=url)  # Use the URL as the IP address
+    sig_gen = RS_SMx(ip_address=ip)  # Use the IP address provided
 
     # Connect to the signal generator
     print("Connecting to R&S SMW200A Signal Generator...")
-    sig_gen.connect()
+    sig_gen.connect()  # Connect without password if not required
     print(f"Connected successfully! Device info: {sig_gen.identification}")
 
     # Set and verify frequency
@@ -34,3 +34,8 @@ def configure_r_and_s_smw200a(url: str, password: str) -> None:
 
     print("Step 6 complete. R&S SMW200A is configured successfully.")
 
+# Add this block to make the script executable as a standalone program
+if __name__ == "__main__":
+    # Example IP address, change it to the actual IP address
+    ip_address = '172.2.2.23'  # Replace with the actual IP address of the device
+    configure_r_and_s_smw200a(ip_address)
