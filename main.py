@@ -1,8 +1,8 @@
-#!python3.11
+#!python3.11  
 # main.py
 
 import logging
-import sys,argparse
+import sys, argparse
 from time import sleep
 from step1_connect import connect_to_cato_client, connect_through_jump_server
 from step2_run_batch import run_batch_script
@@ -14,11 +14,11 @@ from step7_spectrum_analyzer import connect_spectrum_analyzer
 from measurement_module.measurement import perform_measurements, initialize_instruments
 
 # argparser
-parser = argparse.ArgumentParser(description='debug arguments')    #argument for debug description
+parser = argparse.ArgumentParser(description='debug arguments')
 
 # add args
-parser.add_argument('-b','--batch', help='この引数の説明（なくてもよい）', default=r"C:\Users\labuser\qlight-control\run_qlight_check.bat")    #Must args
-parser.add_argument('-p','--paam' , help='この引数の説明（なくてもよい）', default=r"C:\Users\labuser\pybeacon\run_paam_dl_reg.bat")    #Must args
+parser.add_argument('-b','--batch', help='この引数の説明（なくてもよい）', default=r"C:\Users\labuser\qlight-control\run_qlight_check.bat")    # Must args
+parser.add_argument('-p','--paam' , help='この引数の説明（なくてもよい）', default=r"C:\Users\labuser\pybeacon\run_paam_dl_reg.bat")    # Must args
 
 # parse args
 args = parser.parse_args()
@@ -39,90 +39,100 @@ DEVICE_CREDENTIALS = {
 # Flag to track the initialization state
 initialized = False
 
-def initialize(location, mode, target_dir):
-    """Initialization process (Step 1-7)"""
-    global initialized
-    try:
-        if location == "2":  # Japan - Connect through Jump Server
-            logging.info("Japan location selected")
-            jump_username = input("Please enter your jump server username: ").strip()
-            logging.info("Connecting through jump server")
-            connect_through_jump_server(
+# 最大再接続回数を設定
+MAX_RETRIES = 0
+
+def reconnect_if_inactive(target_client, jump_username):
+    """SSHセッションがアクティブでない場合、再接続を試みる"""
+    retries = 0
+    while not target_client.get_transport().is_active() and retries < MAX_RETRIES:
+        logging.warning("SSH session is inactive, reconnecting...")
+        try:
+            target_client = connect_through_jump_server(
                 DEVICE_CREDENTIALS["jump_server_ip"],
                 jump_username,
                 DEVICE_CREDENTIALS["cato_client"]["ip"],
                 DEVICE_CREDENTIALS["cato_client"]["username"],
-                target_dir= r"C:\Users\labuser\qlight-control\run_qlight_check.bat"  # Pass target_dir here
+            )
+            logging.info("Reconnected successfully.")
+            sleep(5)  # 再接続後に少し待機して安定を待つ
+            return target_client
+        except Exception as e:
+            retries += 1
+            logging.error(f"Reconnection attempt {retries} failed: {e}", exc_info=True)
+            if retries >= MAX_RETRIES:
+                logging.error("Maximum reconnection attempts reached, exiting.")
+                sys.exit(1)
+    return target_client
+
+def initialize(location, mode):
+    """Initialization process (Step 1-7)"""
+    global initialized
+
+    try:
+        if location == "2":  # Japan - Connect through Jump Server
+            logging.info("Japan location selected")
+            jump_username = "00210404361"  # 固定
+            logging.info("Connecting through jump server")
+            target_client = connect_through_jump_server(
+                DEVICE_CREDENTIALS["jump_server_ip"],
+                jump_username,
+                DEVICE_CREDENTIALS["cato_client"]["ip"],
+                DEVICE_CREDENTIALS["cato_client"]["username"],
             )
         elif location == "1":  # US - Connect directly to Cato client
             logging.info("US location selected")
             logging.info("Connecting directly to Cato client")
-            connect_to_cato_client(
+            target_client = connect_to_cato_client(
                 DEVICE_CREDENTIALS["cato_client"]["ip"],
                 DEVICE_CREDENTIALS["cato_client"]["username"],
             )
 
-        logging.info("Step 2: Run the batch script")
-        run_batch_script(args.batch)
+        # Check and reconnect if session is inactive
+        target_client = reconnect_if_inactive(target_client, "00210404361")
 
-        logging.info("Step 3: Control the NGP800 power supply")
-        control_ngp800(DEVICE_CREDENTIALS["RS_ngp800"]["ip"])
+        # Run the batch script and check if it was successful
+        batch_script_success = run_batch_script(target_client, args.batch)
+        if not batch_script_success:
+            logging.error("Batch script failed, returning to Step 1 to retry...")
+            return  # 失敗した場合は終了して再試行
 
-        logging.info("Step 4: Run the PAAM download script")
-        sleep(10)
+        # Continue with the other steps (3-7)
+        logging.info("Proceeding to Step 3-7...")
+
+        # Step 3: Control NGP-800
+        control_ngp800(DEVICE_CREDENTIALS["RS_ngp800"])
+
+        # Step 4: Run PAAM script
         run_paam_script(args.paam)
 
-        logging.info("Step 5: Configure Keysight PSG")
-        configure_keysight_psg(DEVICE_CREDENTIALS["keysight_psg"]["ip"])
+        # Step 5: Configure Keysight PSG
+        configure_keysight_psg(DEVICE_CREDENTIALS["keysight_psg"])
 
-        logging.info("Step 6: Configure R&S SMW200A")
-        configure_r_and_s_smw200a(
-            DEVICE_CREDENTIALS["RS_signal_generator_smw200a"]["ip"],
-        )
+        # Step 6: Configure R&S SMW200A
+        configure_r_and_s_smw200a(DEVICE_CREDENTIALS["RS_signal_generator_smw200a"])
 
-        logging.info("Step 7: Connect to the signal analyzer")
-        connect_spectrum_analyzer(
-            DEVICE_CREDENTIALS["RS_spectrum_analyzer"]["ip"],
-        )
+        # Step 7: Connect Spectrum Analyzer
+        connect_spectrum_analyzer(DEVICE_CREDENTIALS["RS_spectrum_analyzer"])
 
-        initialized = True
-        logging.info("Initialization completed.")
     except Exception as e:
         logging.error(f"Initialization failed: {e}", exc_info=True)
         sys.exit(1)
 
-def get_location():
-    """Prompt for location selection with validation."""
-    while True:
-        location = input("Please select your location: (1) US, (2) Japan: ").strip()
-        if location in ["1", "2"]:
-            return location
-        logging.warning("Invalid location selected, please choose '1' for US or '2' for Japan.")
-
-def get_mode():
-    """Prompt for mode selection with validation."""
-    while True:
-        mode = input("Please select the mode: (1) Initialization Mode, (2) Measurement Mode: ").strip()
-        if mode in ["1", "2"]:
-            return mode
-        logging.warning("Invalid mode selected, please choose '1' for Initialization Mode or '2' for Measurement Mode.")
-
 def main():
     global initialized
     try:
-        location = get_location()
-        mode = get_mode()
-
-        target_dir = input("Please enter the target directory: ").strip()  # Ask for target directory
+        location = "2"  # location を "2" に固定（日本）
+        mode = "1"  # mode を "1" に固定
 
         if mode == "1":
             logging.info("Initialization mode selected")
-            initialize(location, mode, target_dir)
+            initialize(location, mode)
 
         elif mode == "2":
             if not initialized:
                 logging.warning("Initialization not performed, initializing now")
-                initialize(location, mode, target_dir)
+                initialize(location, mode)
 
             logging.info("Initializing instruments for measurement")
             rs_sm_url = DEVICE_CREDENTIALS["RS_signal_generator_smw200a"]["ip"]
