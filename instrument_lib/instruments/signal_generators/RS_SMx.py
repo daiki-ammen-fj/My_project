@@ -60,6 +60,27 @@ class RS_SMx(SCPIInstrument):  # noqa
         self._write(f"SOURce{source}:BB:ARBitrary:STATe 1")
         self._write(f"SOURce{source}:BB:ARBitrary:STATe 1")
 
+    def load_5gnr_model(self, waveform: str, source: int = 1) -> None:
+        """Load 5G NR Test model.
+
+        Args:
+            waveform: Test model filename.
+            source: Source input number. Defaults to 1.
+        """
+        self._write(f'SOURce{source}:BB:NR5G:SETTing:TMODel:DL "{waveform}"')
+        self._write(f"SOURce{source}:BB:NR5G:STATe 0")
+        self._write(f"SOURce{source}:BB:NR5G:STATe 1")
+
+    def set_phase_compensation(self, phase_compensation_frequency: float, source: int = 1) -> None:
+        """Set Phase compensation frequency for reference.
+
+        Args:
+            phase_compensation_frequency: Frequency in Hertz (Hz)
+            source: Source input number. Defaults to 1.
+        """
+        self._write(f"SOURce{source}:BB:NR5G:NODE:RFPHase:MODE MAN")
+        self._write(f"SOURce{source}:BB:NR5G:NODE:CELL0:PCFReq {phase_compensation_frequency}")
+
     def set_freq(self, freq: float = 3e9, source: int = 1) -> None:
         """Sets the center frequency.
 
@@ -166,5 +187,3 @@ class RS_SMx(SCPIInstrument):  # noqa
         :param source: Input source number. Defaults to 1.
         """
         self._write(f"OUTPut{source}:USER6:SIGNal LOW")
-
-    # TODO: Add a setup Shawn function.

@@ -1,11 +1,15 @@
 """Instrument Driver for RS_FSx."""
 
+import logging
 from time import sleep
 from typing import Any, Optional, Tuple, Union, Callable
 
 from instrument_lib.utils import InputSelection, SelectionState
 from instrument_lib.utils import GPIBNumber
 from instrument_lib.instruments.instrument import SCPIInstrument
+
+
+logger = logging.getLogger(__name__)
 
 
 class RS_FSx(SCPIInstrument):  # noqa
@@ -65,7 +69,12 @@ class RS_FSx(SCPIInstrument):  # noqa
         return wrapper
 
     def display(self, select: SelectionState = DEFAULT_SELECTION_STATE) -> None:
-        """Toggle display."""
+        """Toggle Display on/off while remote.
+
+        Args:
+            select: On/Off selection state. Defaults to DEFAULT_SELECTION_STATE.
+        """
+        logger.debug(f"Toggling display with selection state: {select}")
         self._write(f"SYSTem:DISPlay:UPDate {select}")
 
     def run_continuous(self, select: SelectionState = DEFAULT_SELECTION_STATE) -> None:
@@ -73,159 +82,173 @@ class RS_FSx(SCPIInstrument):  # noqa
         self._write(f":INIT:CONT {select}")
 
     def set_freq(self, freq: float = 30e9) -> None:
-        """Sets the center frequency.
+        """Set Center Frequency.
 
-        :param freq: Signal frequency in Hz. Defaults to 3e9.
+        Args:
+            freq: Frequency in Hertz (Hz). Defaults to 30e9.
         """
+        logger.info(f"Setting center frequency to {freq} Hz")
         self._write(f":FREQuency:CENT {freq} HZ")
         self.freq = freq
 
     def get_freq(self) -> float:
-        """Gets freq in Hz.
-
-        :return: freq
-        """
+        """Gets freq in Hz."""
+        logger.debug("Fetching current center frequency.")
+        self.freq = float(self._query(":FREQuency:CENT?"))
+        logger.debug(f"Current center frequency => {self.freq}")
         return self.freq
 
     def set_span(self, span: float = 2e6) -> None:
-        """Sets the frequency span.
+        """Set frequency span.
 
-        :param span: Frequency span in Hz. Defaults to 2e6.
+        Args:
+            span: Span range in Hertz. Defaults to 2e6.
         """
+        logger.info(f"Setting frequency span to {span} Hz")
         self._write(f":FREQ:SPAN {span} HZ")
 
-    def set_rbw(self, rbw: float = 100e3) -> None:
-        """Sets the rbw (what is this?).
+    def get_span(self) -> float:
+        """Gets freq in Hz."""
+        logger.debug("Fetching current frequency span.")
+        self.span = float(self._query(":FREQuency:CENT?"))
+        logger.debug(f"Current frequency span => {self.span}")
+        return self.freq
 
-        :param rbw: Defaults to 100e3.
+    def set_rbw(self, rbw: float = 100e3) -> None:
+        """Set the resolution bandwidth.
+
+        Args:
+            rbw: Resolution bandwidth in Hertz. Defaults to 100e3.
         """
+        logger.info(f"Setting RBW to {rbw} Hz")
         self._write(f":BAND {rbw} HZ")
 
     def set_ref(self, ref: float = 0) -> None:
-        """Sets the reference power level.
-
-        :param ref: Reference power level. Defaults to 0.
-        """
+        """Sets the reference power level."""
+        logger.info(f"Setting reference power level to {ref} dBm")
         self._write(f":DISP:WIND:TRAC:Y:RLEV {ref} DBM")
 
     def set_vbw(self, vbw: float = 50) -> None:
-        """Sets vbw value.
-
-        :param vbw: vbw value. Defaults to 50.
-        """
+        """Sets the VBW."""
+        logger.info(f"Setting VBW to {vbw}")
         self._write(f"SENS:BAND:VID {vbw}")
 
     @retry_on_failure
     def get_peak(self) -> Tuple[float, float]:
-        """Gets the peak information (frequency and amplitude) from the "Peak Search".
-
-        :return: Tuple of amplitude and frequency.
-        """
+        """Gets the peak information (frequency and amplitude)."""
+        logger.info("Retrieving peak information.")
         self._write(":CALC1:MARK1:MAX:PEAK")
-        amplitude: float = self.get_y()
-        frequency: float = self.get_x()
+        amplitude = self.get_y()
+        frequency = self.get_x()
+        logger.debug(f"Peak found at Frequency: {frequency} Hz, Amplitude: {amplitude} dBm")
         return amplitude, frequency
 
     @retry_on_failure
     def get_y(self) -> float:
-        """Gets the amplitude (y value) of the marker.
-
-        :return: Amplitude of marker.
-        """
-        amplitude: str = self._query(":CALC:MARK1:Y?") if not self.simulate else "0"
+        """Gets the amplitude (y value) of the marker."""
+        logger.debug("Fetching amplitude of the marker.")
+        amplitude = self._query(":CALC:MARK1:Y?") if not self.simulate else "0"
+        logger.debug(f"Marker amplitude: {amplitude} dBm")
         return float(amplitude)
 
     @retry_on_failure
     def get_x(self) -> float:
-        """Gets the frequency (x value) of the marker.
-
-        :return: Frequency of marker.
-        """
-        frequency: str = self._query(":CALC:MARK1:X?") if not self.simulate else "0"
+        """Gets the frequency (x value) of the marker."""
+        logger.debug("Fetching frequency of the marker.")
+        frequency = self._query(":CALC:MARK1:X?") if not self.simulate else "0"
+        logger.debug(f"Marker frequency: {frequency} Hz")
         return float(frequency)
 
-    def signal_analyzer_setup(self) -> None:
-        """Sets up signal analyzer."""
-        self.set_timeout(2000)
-
-    def single_frequency_setup(self, input_selection: InputSelection = INPUT_1) -> None:
-        """Setup single frequency.
-
-        :param input_selection: Input value. Defaults to Input1.
-        """
-        self.set_input_type(input_selection)
-        self._write(":CALC1:MARK1:STAT ON")
-        self._write(":CALC1:MARK1:MAX:PEAK")
-        self._write(":INIT:CONT ON")
-
     def set_input_type(self, input_selection: InputSelection = INPUT_2) -> None:
-        """Sets input type.
-
-        :param input_selection: Input value. Defaults to Input2.
-        """
+        """Sets input type."""
+        logger.info(f"Setting input type to {input_selection}")
         self._write(f":INP:TYPE {input_selection}")
 
-    def channel_power_setup(self, bandwidth: float = 388e6, max_power: float = -30) -> None:
-        """Sets up channel power.
-
-        :param bandwidth: Bandwitdh. Defaults to 388e6.
-        :param max_power: Maximum power level. Defaults to -30.
-        """
-        self._write("INST:SEL SAN")
-        self._write(":CALC:MARK:FUNC:POW:SEL ACP")
-        self._write(":POW:ACH:TXCH:COUN 1")
-        sleep(2)
-        self._write(':POWer:ACHannel:NAME:CHANel1 "TX1"')
-        self._write(f":POW:ACH:BAND {bandwidth} HZ")
-
-        span = bandwidth * 2
-
-        self._write(f":FREQ:SPAN {span} HZ")
-        self.set_timeout(10000)
-        self.set_ref(max_power)
-
     def get_channel_power(self) -> float:
-        """Gets the channel power.
-
-        :return: Channel power.
-        """
+        """Gets the channel power."""
+        logger.info("Retrieving channel power.")
         self._write("SYSTem:SEQuencer ON")
         self._write("INITiate:SEQuencer:MODE SINGle")
         self._write("INITiate:SEQuencer:IMMediate;*OPC?")
-
-        if not self.simulate:
-            power: str = self._query("CALCulate:MARKer:FUNCtion:POWer:RESult? CPOWer")
-        else:
-            power = "0"
-
+        power = (
+            self._query("CALCulate:MARKer:FUNCtion:POWer:RESult? CPOWer")
+            if not self.simulate
+            else "0"
+        )
+        logger.debug(f"Channel power: {power} dBm")
         return float(power)
 
-    def evm_setup(self, bandwidth: float = 400, swap_iq: bool = True) -> None:
-        """Sets up EVM.
+    def setup_spectrum(self, center_freq: float, span: float, markers: list[float]) -> None:
+        """Setup Spectrum Analyzer Tab."""
+        logger.info(
+            f"Setting up spectrum with center frequency: {center_freq} Hz, span: {span} Hz, markers: {markers}"
+        )
+        self._write("INST:SEL SAN")
+        self._write(":INIT:CONT OFF")
+        self._write(f":SENS:FREQ:CENT {center_freq}")
+        self._write(f":SENS:FREQ:SPAN {span}")
+        self._write(":SENS:BAND:RES 1000000")
+        self._write(":SENS:BAND:VID 50000")
+        self._write(":DISP:WIND1:SUBW:TRAC1:Y:RLEV -30")
+        self._write(":DISP:WIND1:SUBW:TRAC1:Y:SCAL:AUTO ONCE")
 
-        :param bandwidth: Bandwidth. Defaults to 400.
-        :param swap_iq: Swap IQ. Defaults to True.
+        for marker, freq in enumerate(markers):
+            logger.debug(f"Setting marker {marker+1} at frequency {freq} Hz")
+            self._write(f":CALC1:MARK{marker+1}:STAT ON")
+            self._write(f":CALC1:MARK{marker+1}:X {freq}")
+        self._write(":INIT:CONT ON")
+
+    def setup_acp(
+        self, num_channels: int, channel_bw: int, channel_spacing: int, tab_name: str = "ACP"
+    ) -> None:
+        """Setup ACP Tab.
+
+        Args:
+            num_channels: Number of TX channels.
+            channel_bw: Channel bandwidth
+            channel_spacing: Channel spacing
+            tab_name: Display name. Defaults to "ACP".
         """
-        self._write(":SYST:DISP:UPD ON")
+        self._write(f"INST:CRE:NEW SANALYZER, '{tab_name}'")
         self._write(":INIT:CONT OFF")
-        self._write(":INST:CRE:NEW NR5G, '5G NR'")
-        self._write(":INIT:CONT OFF")
-        self._write(f":MMEM:LOAD:TMOD:CC1 'NR-FR2-TM3_1__TDD_{bandwidth}MHz_120kHz'")
+        self._write(":CALC1:MARK:FUNC:POW:SEL ACP")
+        self._write(f":SENS:POW:ACH:TXCH:COUN {num_channels}")
+        self._write(f":SENS:POW:ACH:TXCH:BWID:CHAN1 {int(channel_bw)}")
+        self._write(f":SENS:POW:ACH:TXCH:SPAC:CHAN1 {int(channel_spacing)}")
+        self._write(":SENS:BAND:RES 20000")
+        self._write(":SENS:BAND:VID 50000")
+        self._write(":DISP:WIND:SUBW:TRAC:Y:SPAC LOG")
+        self._write(":DISP:WIND:SUBW:TRAC:Y:SCAL 60")
+        self._write(":DISP:WIND:TRAC:Y:SCAL:RLEV -30")
+
+    def evm_setup_5gnr(self, frequency: float, waveform: str, tab_name: str = "5G NR") -> None:
+        """Setup 5G NR mode with specific waveform file.
+
+        Args:
+            frequency: RF Frequency in Hertz (Hz).
+            waveform: Waveform filename.
+            tab_name: Tab display name. Defaults to "5G NR".
+        """
+        try:
+            self._write(f"INST:SEL '{tab_name}'")
+        except Exception as e:
+            logger.warning(f"Could not find tab '{tab_name}' dut to {str(e)}. Creating new tab.")
+            self._write(f":INST:CRE:NEW NR5G, '{tab_name}'")
+        self._write(":INIT:CONT ON")
+        self._write(f":MMEM:LOAD:TMOD:CC1 '{waveform}'")
         self._write(":CONF:NR5G:DL:CC1:IDC ON")
-        self._write(":INP:TYPE INPUT2")
         self._write(":SENS:NR5G:DEM:EFLR ON")
         self._write(":SYST:DISP:UPD ON")
-        if swap_iq:
-            self._write(":SENS:SWAP ON")  # 3 GHz
-        else:
-            self._write(":SENS SWAP OFF")  # 7 GHz
+        self._write(f":SENS:FREQ:CENT {frequency}")
+        self._write(":CONF:NR5G:DL:CC1:RFUC:STAT ON")
+        self._write(":CONF:NR5G:DL:CC1:RFUC:FZER:MODE MAN")
+        self._write(f":CONF:NR5G:DL:CC1:RFUC:FZER:FREQ {frequency} HZ")
+        self._write(":SENS:ADJ:EVM;*WAI")
+        sleep(0.5)
+        self._write(":INIT:CONT ON")
 
-        self._write(":DISP:WIND5:SUBW:SEL")
-        self._write("INP:ATT:AUTO OFF")
-        self._write("INP:ATT 0")
-
-    def evm_options(self, phase_comp_frequency: float) -> None:
-        """_write EVM Options.
+    def set_phase_compensation_frequency(self, phase_comp_frequency: float) -> None:
+        """Set phase compensation frequency.
 
         :param phase_comp_frequency: Frequency of phase compensation.
         """
