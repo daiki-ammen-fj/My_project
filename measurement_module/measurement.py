@@ -1,4 +1,3 @@
-#!python3.11
 # measurement.py
 
 # Import necessary libraries for controlling RS_FSx (Signal and Spectrum Analyzer) and RS_SMx (Signal Generator)
@@ -68,7 +67,6 @@ def find_evm_threshold(rs_sm, rs_fsx, config):
 
     return power_points
 
-
 def measure_parameters(rs_fsx, config):
     """Measure additional parameters like CF, O/P Power, ACLR, and EIRP."""
     path_loss = config["path_loss"]
@@ -81,27 +79,26 @@ def measure_parameters(rs_fsx, config):
 
     return cf, output_power, aclr_lower, aclr_upper, eirp
 
-def initialize_instruments(rs_sm_url, rs_fsx_url):
-    """Initialize RS_SMx (Signal Generator) and RS_FSx (Signal Analyzer)."""
-    try:
-        # Create instances for RS_SMx (Signal Generator) and RS_FSx (Signal Analyzer)
-        rs_sm = RsInstrument(f"TCPIP::{rs_sm_url}::INSTR")  # Use the URL as the IP address for RS_SMx
-        rs_fsx = RsInstrument(f"TCPIP::{rs_fsx_url}::INSTR")  # Use the URL as the IP address for RS_FSx
+# def initialize_instruments(rs_sm_url, rs_fsx_url):
+#     """Initialize RS_SMx (Signal Generator) and RS_FSx (Signal Analyzer)."""
+#     try:
+#         # Create instances for RS_SMx (Signal Generator) and RS_FSx (Signal Analyzer)
+#         rs_sm = RsInstrument(f"TCPIP::{rs_sm_url}::INSTR")  # Use the URL as the IP address for RS_SMx
+#         rs_fsx = RsInstrument(f"TCPIP::{rs_fsx_url}::INSTR")  # Use the URL as the IP address for RS_FSx
 
-        # Connect to the instruments
-        print("Connecting to RS_SMx (Signal Generator)...")
-        rs_sm.connect()
-        print(f"Connected to RS_SMx. Device info: {rs_sm.query('*IDN?')}")
+#         # Open connections to the instruments
+#         print("Connecting to RS_SMx (Signal Generator)...")
+#         rs_sm.open()  # Use open() to establish connection
+#         print(f"Connected to RS_SMx. Device info: {rs_sm.query('*IDN?')}")
 
-        print("Connecting to RS_FSx (Signal Analyzer)...")
-        rs_fsx.connect()
-        print(f"Connected to RS_FSx. Device info: {rs_fsx.query('*IDN?')}")
+#         print("Connecting to RS_FSx (Signal Analyzer)...")
+#         rs_fsx.open()  # Use open() to establish connection
+#         print(f"Connected to RS_FSx. Device info: {rs_fsx.query('*IDN?')}")
 
-        return rs_sm, rs_fsx
-    except Exception as e:
-        print(f"Error initializing instruments: {e}")
-        raise
-
+#         return rs_sm, rs_fsx
+#     except Exception as e:
+#         print(f"Error initializing instruments: {e}")
+#         raise
 
 def perform_measurements(rs_sm, rs_fsx, config):
     """Perform the full measurement process with all parameter combinations."""
@@ -164,7 +161,6 @@ def perform_measurements(rs_sm, rs_fsx, config):
 
     return results
 
-
 def save_measurement_results(results, frequency, bandwidth, modulation, directory="measurement_results"):
     """Save the measurement results to a JSON file with a dynamic filename."""
     # Create the directory if it doesn't exist
@@ -177,4 +173,3 @@ def save_measurement_results(results, frequency, bandwidth, modulation, director
     with open(filename, 'w') as json_file:
         json.dump(results, json_file, indent=4)
     print(f"Results saved to {filename}")
-
