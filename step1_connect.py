@@ -19,11 +19,11 @@ def check_device_connection(device_ip):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            timeout=3  # タイムアウトを5秒に設定
+            timeout=3  # タイムアウトを3秒に設定
         )
         
         if response.returncode == 0:
-            logging.info(f"Device {device_ip} is reachable.")
+            logging.info(f"Device {device_ip} is reachable and connection verified.")
             return True
         else:
             logging.error(f"Device {device_ip} is not reachable.")

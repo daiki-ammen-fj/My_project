@@ -57,6 +57,8 @@ def control_ngp800(ip, debug_mode):
         limit_state = power_supply.get_limit_state(1)  # Ensure this method takes 'channel' as an argument
         logging.info(f"Current safety limit state: {limit_state}")
         
+        logging.info("NGP800 Power Supply control successful.")
+        
     except Exception as e:
         logging.error(f"Failed to control NGP800: {e}")
         raise
