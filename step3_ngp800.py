@@ -1,13 +1,14 @@
 #!python3.11
-# step3_ngp800.py
+# step3_ngp800
 
 import logging
+import sys  # sysモジュールをインポート
 from instrument_lib import RS_NGPx
 from time import sleep
 
 # Operate the NGP800 using SCPI commands, without using VNC.
 # Function to control the NGP800 power supply using SCPI commands
-def control_ngp800(ip):
+def control_ngp800(ip, debug_mode):
     logging.info("Step 3: Connecting to NGP800 Power Supply...")
     try:
         # Connect to the NGP800 power supply
@@ -22,9 +23,12 @@ def control_ngp800(ip):
             logging.warning("No device information received. Connection may have failed.")
             return
         
-        # Enable output on channel 1
-        power_supply.toggle_channel_output_state(1, 1)
-        logging.info("Channel 1 output enabled.")
+        # If not in debug mode, enable output on channel 1
+        if not debug_mode:  # This is True when running in normal mode (not in debug mode)
+            power_supply.toggle_channel_output_state(1, 1)
+            logging.info("Channel 1 output enabled.")
+        else:
+            logging.info("Debug mode: Skipping channel enable.")
 
         # Wait for 3 seconds before checking the status
         sleep(3)
@@ -50,7 +54,7 @@ def control_ngp800(ip):
         logging.info(f"Master output state: {master_output_state}")
 
         # Get the current safety limit state (displayed last)
-        limit_state = power_supply.get_limit_state()
+        limit_state = power_supply.get_limit_state(1)  # Ensure this method takes 'channel' as an argument
         logging.info(f"Current safety limit state: {limit_state}")
         
     except Exception as e:
@@ -62,9 +66,13 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
     try:
+        # Check if running in debug mode
+        debug_mode = 'DEBUG' in sys.argv or 'PYTHON_DEBUG' in sys.argv
+        logging.info(f"Debug mode is {'enabled' if debug_mode else 'disabled'}")
+
         # Directly specify the IP address (replace with the correct one)
         ngp_ip = '172.22.2.12'  # Example IP address, replace as needed
-        control_ngp800(ip=ngp_ip)  # Control the NGP800 with the provided IP
+        control_ngp800(ip=ngp_ip, debug_mode=debug_mode)  # Control the NGP800 with the provided IP
     except Exception as e:
         logging.error(f"Error in Step 3 process: {e}")
         raise

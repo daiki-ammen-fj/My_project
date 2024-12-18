@@ -12,7 +12,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 
-def run_batch_script(batch_script_path, timeout=60):
+def run_batch_script(batch_script_path, timeout=3):
     """
     Executes the specified batch script on the target system.
 
@@ -27,10 +27,10 @@ def run_batch_script(batch_script_path, timeout=60):
     time.sleep(1)
 
     try:
-        # Run the batch file
+        # Run the batch file with shell=True to execute the script
         process = subprocess.Popen(
             batch_script_path, 
-            shell=True, 
+            shell=True,  # Necessary to execute batch files
             stdout=subprocess.PIPE, 
             stderr=subprocess.PIPE
         )
@@ -40,10 +40,14 @@ def run_batch_script(batch_script_path, timeout=60):
 
         # Capture and log the output and error
         if stdout:
-            logging.info(stdout.decode('utf-8'))
+            logging.info("Batch script output:\n" + stdout.decode('utf-8'))
+        else:
+            logging.info("No output from the batch script.")
 
         if stderr:
-            logging.error(stderr.decode('utf-8'))
+            logging.error("Batch script error:\n" + stderr.decode('utf-8'))
+        else:
+            logging.info("No error from the batch script.")
 
         # Check if the batch script was successful
         exit_status = process.returncode
@@ -56,6 +60,9 @@ def run_batch_script(batch_script_path, timeout=60):
 
     except subprocess.TimeoutExpired:
         logging.error(f"Batch script timed out after {timeout} seconds.")
+        return False
+    except FileNotFoundError:
+        logging.error(f"Batch script not found at: {batch_script_path}")
         return False
     except Exception as e:
         logging.error(f"Failed to run batch script: {e}")
@@ -70,3 +77,5 @@ if __name__ == "__main__":
     success = run_batch_script(BATCH_SCRIPT_PATH)
     if not success:
         logging.error("Batch script execution failed.")
+    else:
+        logging.info("Batch script executed successfully.")
