@@ -12,7 +12,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 
-def connect_to_cato_client(ip, username, retries=0, timeout=10, key_filename=None, port=22):
+def connect_to_SanDiego_Server(ip, username, retries=0, timeout=10, key_filename=None, port=22):
     """
     Connect to the Cato client via SSH on a Windows machine using SSH key authentication.
 

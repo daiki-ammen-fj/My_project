@@ -41,7 +41,7 @@ def run_batch_script(target_client, batch_script_path, timeout=60):
         bool: True if the script executed successfully, False otherwise.
     """
     logging.info(f"Running batch script: {batch_script_path}")
-    time.sleep(2)
+    time.sleep(1)
 
     try:
         # Check if SSH session is active, if not we will reconnect

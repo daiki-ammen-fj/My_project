@@ -1,12 +1,12 @@
-#!python3.11  
+#!python3.11
 # main.py
 
 import logging
 import sys, argparse
 from time import sleep
-from step1_connect import connect_to_cato_client, connect_through_jump_server
+from step1_connect import connect_to_SanDiego_Server, connect_through_jump_server
 from step2_run_batch import run_batch_script
-from step3_ngp800 import control_ngp800
+from step3_ngp800 import control_ngp800, test_ngp800_connection  # Add test_ngp800_connection here
 from step4_run_paam import run_paam_script
 from step5_psg import configure_keysight_psg
 from step6_smw200a import configure_r_and_s_smw200a
@@ -28,8 +28,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 # Device credentials
 DEVICE_CREDENTIALS = {
-    "cato_client": {"ip": "172.22.0.12", "username": "labuser", "password": "1234"},
-    "RS_ngp800": {"ip": "172.22.2.12", "username": "Instrument", "password": "instrument"},
+    "SanDiego_Server": {"ip": "172.22.0.12", "username": "labuser", "password": "1234"},
+    "RS_ngp800": {"ip": "172.22.2.12"}, # "username": "Instrument", "password": "instrument"
     "RS_spectrum_analyzer": {"ip": "172.22.0.70", "username": "Instrument", "password": "894129"},
     "keysight_psg": {"ip": "172.22.2.31", "username": "Instrument", "password": "instrument"},
     "RS_signal_generator_smw200a": {"ip": "172.22.2.23", "username": "Instrument", "password": "instrument"},
@@ -51,8 +51,8 @@ def reconnect_if_inactive(target_client, jump_username):
             target_client = connect_through_jump_server(
                 DEVICE_CREDENTIALS["jump_server_ip"],
                 jump_username,
-                DEVICE_CREDENTIALS["cato_client"]["ip"],
-                DEVICE_CREDENTIALS["cato_client"]["username"],
+                DEVICE_CREDENTIALS["SanDiego_Server"]["ip"],
+                DEVICE_CREDENTIALS["SanDiego_Server"]["username"],
             )
             logging.info("Reconnected successfully.")
             sleep(5)  # 再接続後に少し待機して安定を待つ
@@ -77,15 +77,15 @@ def initialize(location, mode):
             target_client = connect_through_jump_server(
                 DEVICE_CREDENTIALS["jump_server_ip"],
                 jump_username,
-                DEVICE_CREDENTIALS["cato_client"]["ip"],
-                DEVICE_CREDENTIALS["cato_client"]["username"],
+                DEVICE_CREDENTIALS["SanDiego_Server"]["ip"],
+                DEVICE_CREDENTIALS["SanDiego_Server"]["username"],
             )
         elif location == "1":  # US - Connect directly to Cato client
             logging.info("US location selected")
             logging.info("Connecting directly to Cato client")
-            target_client = connect_to_cato_client(
-                DEVICE_CREDENTIALS["cato_client"]["ip"],
-                DEVICE_CREDENTIALS["cato_client"]["username"],
+            target_client = connect_to_SanDiego_Server(
+                DEVICE_CREDENTIALS["SanDiego_Server"]["ip"],
+                DEVICE_CREDENTIALS["SanDiego_Server"]["username"],
             )
 
         # Check and reconnect if session is inactive
@@ -100,8 +100,9 @@ def initialize(location, mode):
         # Continue with the other steps (3-7)
         logging.info("Proceeding to Step 3-7...")
 
-        # Step 3: Control NGP-800
-        control_ngp800(DEVICE_CREDENTIALS["RS_ngp800"])
+        # Step 3: Test NGP-800 connection before proceeding to Step 3
+        test_ngp800_connection(DEVICE_CREDENTIALS["RS_ngp800"]["ip"]) #for debug
+        control_ngp800(DEVICE_CREDENTIALS["RS_ngp800"]["ip"])
 
         # Step 4: Run PAAM script
         run_paam_script(args.paam)
@@ -124,6 +125,10 @@ def main():
     try:
         location = "2"  # location を "2" に固定（日本）
         mode = "1"  # mode を "1" に固定
+
+        # Uncomment and modify for user selection when needed
+        # location = input("Select location (1: US, 2: Japan): ").strip()
+        # mode = input("Select mode (1: Initialization, 2: Measurement): ").strip()
 
         if mode == "1":
             logging.info("Initialization mode selected")
