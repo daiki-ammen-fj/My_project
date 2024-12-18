@@ -6,7 +6,7 @@ import sys, argparse
 from time import sleep
 from step1_connect import connect_to_SanDiego_Server, connect_through_jump_server
 from step2_run_batch import run_batch_script
-from step3_ngp800 import control_ngp800, test_ngp800_connection  # Add test_ngp800_connection here
+from step3_ngp800 import control_ngp800
 from step4_run_paam import run_paam_script
 from step5_psg import configure_keysight_psg
 from step6_smw200a import configure_r_and_s_smw200a
@@ -101,8 +101,8 @@ def initialize(location, mode):
         logging.info("Proceeding to Step 3-7...")
 
         # Step 3: Test NGP-800 connection before proceeding to Step 3
-        test_ngp800_connection(DEVICE_CREDENTIALS["RS_ngp800"]["ip"]) #for debug
-        control_ngp800(DEVICE_CREDENTIALS["RS_ngp800"]["ip"])
+        target_client = reconnect_if_inactive(target_client, "00210404361")
+        control_ngp800(DEVICE_CREDENTIALS["RS_ngp800"]["ip"],target_client)
 
         # Step 4: Run PAAM script
         run_paam_script(args.paam)
