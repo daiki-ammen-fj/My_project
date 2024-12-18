@@ -11,9 +11,12 @@
             "program": "${workspaceFolder}/main.py",  // main.py のフルパスを指定
             "console": "integratedTerminal",
             "args": [
-                "-b", "qlight-control\\dammy_batch\\run_qlight_check.bat",  // 引数をリスト形式で指定
-                "-p", "pybeacon\\dammy_batch\\run_paam_dl_reg.bat"
-            ]
+                "-b", "C:\\Users\\labuser\\qlight-control\\dammy_batch\\run_qlight_check.bat",  // 引数をリスト形式で指定
+                "-p", "C:\\Users\\labuser\\pybeacon\\dammy_batch\\run_paam_dl_reg.bat"
+            ],
+            "env": {
+                "DEBUG": "True"  // デバッグモードを示す環境変数
+            }
         }
     ]
 }
