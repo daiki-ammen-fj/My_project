@@ -6,20 +6,20 @@ import subprocess
 import platform
 
 def check_device_connection(device_ip):
-    """デバイスのIPアドレスがネットワーク上で到達可能かを確認"""
+    """Check if the device IP address is reachable on the network."""
     try:
-        # オペレーティングシステムによってpingコマンドのオプションが異なるため、適切に設定
+        # Set ping command based on the operating system
         if platform.system().lower() == "windows":
-            ping_command = ['ping', '-n', '1', device_ip]  # Windowsでは-nで回数指定
+            ping_command = ['ping', '-n', '2', device_ip]  # Use -n for count on Windows
         else:
-            ping_command = ['ping', '-c', '1', device_ip]  # Linux/Macでは-cで回数指定
+            ping_command = ['ping', '-c', '2', device_ip]  # Use -c for count on Linux/Mac
 
         response = subprocess.run(
             ping_command,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            timeout=3  # タイムアウトを3秒に設定
+            timeout=3  # Set timeout to 3 seconds
         )
         
         if response.returncode == 0:
@@ -27,16 +27,16 @@ def check_device_connection(device_ip):
             return True
         else:
             logging.error(f"Device {device_ip} is not reachable.")
-            return handle_connection_error(device_ip)  # エラー時に選択肢を提示
+            return handle_connection_error(device_ip)  # Provide options in case of error
     except subprocess.TimeoutExpired:
         logging.error(f"Ping to {device_ip} timed out.")
-        return handle_connection_error(device_ip)  # エラー時に選択肢を提示
+        return handle_connection_error(device_ip)  # Provide options in case of error
     except Exception as e:
         logging.error(f"Failed to ping {device_ip}: {e}")
-        return handle_connection_error(device_ip)  # エラー時に選択肢を提示
+        return handle_connection_error(device_ip)  # Provide options in case of error
 
 def handle_connection_error(device_ip):
-    """接続エラー時にユーザーに選択肢を提示する"""
+    """Prompt the user for options in case of connection errors."""
     user_input = input(f"Failed to reach {device_ip}. Do you want to continue the process? (y/n): ").strip().lower()
     if user_input == 'y':
         logging.info("Proceeding with the next steps despite the connection issue.")

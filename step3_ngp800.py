@@ -2,7 +2,7 @@
 # step3_ngp800
 
 import logging
-import sys  # sysモジュールをインポート
+import sys 
 from instrument_lib import RS_NGPx
 from time import sleep
 

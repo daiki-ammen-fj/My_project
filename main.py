@@ -5,6 +5,7 @@ import logging
 import sys
 import argparse
 import os
+import subprocess  # 追加
 from step1_connect import check_device_connection 
 from step2_run_batch import run_batch_script
 from step3_ngp800 import control_ngp800
@@ -17,7 +18,7 @@ from step7_spectrum_analyzer import connect_spectrum_analyzer
 DEVICE_CREDENTIALS = {
     "RS_ngp800": {"ip": "172.22.2.12"},
     "RS_spectrum_analyzer": {"ip": "172.22.0.70", "tcpip": "172.22.0.70::5025"},
-    "keysight_psg": {"ip": "172.22.2.31", "tcpip": "172.22.2.31::5025"},
+    "keysight_psg": {"ip": "172.22.2.31", "tcpip": "172.22.2.31::hislip200"},
     "RS_signal_generator_smw200a": {"ip": "172.22.2.23", "tcpip": "172.22.2.23::5025"},
 }
 
@@ -43,6 +44,35 @@ def is_debug_mode():
     debug_mode = os.getenv('DEBUG', 'False') == 'True' or args.debug
     logging.info(f"Debug mode is {'enabled' if debug_mode else 'disabled'}")
     return debug_mode
+
+def run_measurement():
+    """Run the measurement.py script and prompt for re-execution."""
+    try:
+        measurement_script_path = os.path.join("measurement_module", "measurement.py")
+        if not os.path.exists(measurement_script_path):
+            logging.error(f"Measurement script not found at {measurement_script_path}. Exiting.")
+            sys.exit(1)
+
+        while True:
+            logging.info("Running measurement script...")
+            result = subprocess.run([sys.executable, measurement_script_path], capture_output=True, text=True)
+
+            if result.returncode == 0:
+                logging.info("Measurement script completed successfully.")
+                logging.info(result.stdout)
+            else:
+                logging.error("Measurement script failed.")
+                logging.error(result.stderr)
+
+            # Ask the user whether to run the script again
+            user_input = input("Do you want to run the measurement script again? (yes/no): ").strip().lower()
+            if user_input not in ['yes', 'y']:
+                logging.info("Exiting measurement script loop.")
+                break
+
+    except Exception as e:
+        logging.error(f"Failed to execute measurement script: {e}", exc_info=True)
+        sys.exit(1)
 
 def initialize():
     """Initialization process."""
@@ -73,15 +103,20 @@ def initialize():
 
         # Step 5: Configure Keysight PSG
         logging.info("Proceeding to Step 5...")
-        configure_keysight_psg(DEVICE_CREDENTIALS["keysight_psg"]["tcpip"], debug_mode)
+        configure_keysight_psg(DEVICE_CREDENTIALS["keysight_psg"]["ip"], debug_mode)
 
         # Step 6: Configure R&S SMW200A
         logging.info("Proceeding to Step 6...")
-        configure_r_and_s_smw200a(DEVICE_CREDENTIALS["RS_signal_generator_smw200a"]["tcpip"], debug_mode)
+        configure_r_and_s_smw200a(DEVICE_CREDENTIALS["RS_signal_generator_smw200a"]["ip"], debug_mode)
 
         # Step 7: Connect Spectrum Analyzer
         logging.info("Proceeding to Step 7...")
-        connect_spectrum_analyzer(DEVICE_CREDENTIALS["RS_spectrum_analyzer"]["tcpip"], debug_mode)
+        if connect_spectrum_analyzer(DEVICE_CREDENTIALS["RS_spectrum_analyzer"]["ip"], debug_mode):
+            # Step 8: Run measurement script if Step 7 succeeds
+            run_measurement()
+        else:
+            logging.error("Step 7 failed. Measurement script will not be executed.")
+            sys.exit(1)
 
     except Exception as e:
         logging.error(f"Initialization failed: {e}", exc_info=True)
